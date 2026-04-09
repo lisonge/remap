@@ -118,11 +118,12 @@ package example.app
 import android.content.IPackageManager
 import android.content.PackageInfo
 import android.content.PackageInfoList
+import android.os.Build
 
 fun test(manger: IPackageManager, flags: Long, userId: Int): List<PackageInfo> {
-    return (if (AndroidTarget.CINNAMON_BUN) { // android17+
+    return (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) { // android17+
         manger.getInstalledPackagesV17(flags, userId)
-    } else if (AndroidTarget.TIRAMISU) { // android13 - android16
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // android13 - android16
         manger.getInstalledPackages(flags, userId)
     } else { // android8 - android12L
         manger.getInstalledPackages(flags.toInt(), userId)
