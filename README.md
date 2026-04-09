@@ -1,6 +1,6 @@
 # remap
 
-[![Maven Central](https://img.shields.io/maven-central/v/li.songe.loc/loc-compiler.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/li.songe.remap/remap-annotation)
+[![Maven Central](https://img.shields.io/maven-central/v/li.songe.remap/remap-annotation.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/li.songe.remap/remap-annotation)
 [![License](http://img.shields.io/:License-Apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html)
 
 A Gradle plugin that uses ASM bytecode transformation to enable compile-time access to Android hidden APIs.
