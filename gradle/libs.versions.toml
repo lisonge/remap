@@ -1,0 +1,12 @@
+[versions]
+kotlin = "2.3.20"
+agp = "9.1.0"
+asm = "9.9.1"
+
+[libraries]
+asm-commons = { group = "org.ow2.asm", name = "asm-commons", version.ref = "asm" }
+agp-api = { group = "com.android.tools.build", name = "gradle-api", version.ref = "agp" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+maven-publish = "com.vanniktech.maven.publish:0.34.0"

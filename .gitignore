@@ -1,0 +1,12 @@
+.idea
+.gradle
+.kotlin
+.vscode
+build
+kotlin-js-store
+*.iml
+.DS_Store
+.externalNativeBuild
+.cxx
+local.properties
+xcuserdata
