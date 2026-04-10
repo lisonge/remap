@@ -12,7 +12,7 @@ dependencies {
 
 gradlePlugin {
     plugins {
-        create("remap") {
+        create(rootProject.name) {
             id = project.group.toString()
             displayName = "Remap Gradle Plugin"
             description = "A plugin for Remap Api"
