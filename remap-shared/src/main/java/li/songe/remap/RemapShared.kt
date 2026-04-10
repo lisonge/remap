@@ -1,6 +1,6 @@
 package li.songe.remap
 
-private const val META_SUFFIX = "\$Remap114514"
+private const val META_SUFFIX = "\$R114514"
 
 private const val TYPE_PREFIX = "T."
 

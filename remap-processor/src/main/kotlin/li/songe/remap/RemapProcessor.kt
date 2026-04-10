@@ -12,6 +12,7 @@ import javax.lang.model.element.PackageElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import javax.tools.Diagnostic
+import javax.tools.JavaFileObject
 import kotlin.reflect.KClass
 
 class RemapProcessor : AbstractProcessor() {
@@ -24,20 +25,24 @@ class RemapProcessor : AbstractProcessor() {
         roundEnv.getElementsAnnotatedWith(typeAnnElement).forEach { typeElement ->
             typeElement as TypeElement
             val toClassName = findAnnotationValue(typeElement, typeAnnElement)
+            if (parseClassName(typeElement) == toClassName) {
+                printErrorMessage("the type $toClassName by RemapType parameter must be different type")
+            }
             results.add(Triple(typeElement, toClassName, ArrayList()))
         }
         roundEnv.getElementsAnnotatedWith(methodAnnElement).forEach { methodElement ->
             methodElement as ExecutableElement
             val toMethodName = findAnnotationValue(methodElement, methodAnnElement)
+            if (methodElement.simpleName.contentEquals(toMethodName)) {
+                printErrorMessage("the method ${methodElement.simpleName} by RemapMethod parameter must be different name")
+                return true
+            }
             val pair = methodElement to toMethodName
             val parent = methodElement.enclosingElement as TypeElement
             val list = results.find { it.first == parent }?.third
             if (list != null) {
                 if (list.any { it.first.simpleName.contentEquals(methodElement.simpleName) }) {
-                    processingEnv.messager.printMessage(
-                        Diagnostic.Kind.ERROR,
-                        "the method ${methodElement.simpleName} by RemapMethod annotated should not supported overload"
-                    )
+                    printErrorMessage("the method ${methodElement.simpleName} by RemapMethod annotated is not supported overload")
                     return true
                 }
                 list.add(pair)
@@ -45,14 +50,21 @@ class RemapProcessor : AbstractProcessor() {
                 results.add(Triple(parent, null, mutableListOf(pair)))
             }
         }
+        val outputs = hashMapOf<String, Pair<ClassWriter, JavaFileObject>>()
         results.forEach { (typeElement, toClassName, methods) ->
-            processUnit(typeElement, toClassName, methods)
+            processUnit(outputs, typeElement, toClassName, methods)
+        }
+        outputs.values.forEach { (metadataWriter, metadataFile) ->
+            metadataWriter.visitEnd()
+            metadataFile.openOutputStream().use {
+                it.write(metadataWriter.toByteArray())
+            }
         }
         return true
     }
 
-
     private fun processUnit(
+        outputs: MutableMap<String, Pair<ClassWriter, JavaFileObject>>,
         typeElement: TypeElement,
         toClassName: String?,
         methods: List<Pair<ExecutableElement, String>>?,
@@ -60,33 +72,32 @@ class RemapProcessor : AbstractProcessor() {
         val fromClassName = parseClassName(typeElement)
 
         val metadataName = getMetaClassName(fromClassName)
-        val metadataWriter = ClassWriter(0).apply {
-            visit(
-                Opcodes.V1_8,
-                Opcodes.ACC_FINAL or Opcodes.ACC_PRIVATE or Opcodes.ACC_SUPER,
-                metadataName.replace('.', '/'),
-                null,
-                Type.getInternalName(Any::class.java),
-                null,
-            )
-            if (toClassName != null) {
-                visitAnnotation(toDescriptor(buildTypeName(toClassName)), false).visitEnd()
-            }
-            methods?.forEach { (methodElement, toMethodName) ->
-                val fromMethodName = methodElement.simpleName.toString()
-                visitAnnotation(toDescriptor(buildMethodName(fromMethodName, toMethodName)), false).visitEnd()
-            }
-            visitEnd()
+        val (metadataWriter) = outputs.getOrPut(metadataName) {
+            ClassWriter(0).apply {
+                visit(
+                    Opcodes.V1_8,
+                    Opcodes.ACC_FINAL or Opcodes.ACC_PRIVATE or Opcodes.ACC_SUPER,
+                    metadataName.replace('.', '/'),
+                    null,
+                    Type.getInternalName(Any::class.java),
+                    null,
+                )
+            } to processingEnv.filer.createClassFile(metadataName, typeElement)
         }
-        val metadataFile = processingEnv.filer.createClassFile(metadataName, typeElement)
-        metadataFile.openOutputStream().use {
-            it.write(metadataWriter.toByteArray())
+
+        if (toClassName != null) {
+            metadataWriter.visitAnnotation(toDescriptor(buildTypeName(toClassName)), false).visitEnd()
+        }
+        methods?.forEach { (methodElement, toMethodName) ->
+            val fromMethodName = methodElement.simpleName.toString()
+            metadataWriter.visitAnnotation(toDescriptor(buildMethodName(fromMethodName, toMethodName)), false)
+                .visitEnd()
         }
 
         if (toClassName != null) {
             typeElement.enclosedElements.forEach { enclosedElement ->
-                if (enclosedElement is TypeElement && enclosedElement.getAnnotation(RemapType::class.java) != null) {
-                    processUnit(enclosedElement, toClassName + "$" + enclosedElement.simpleName, null)
+                if (enclosedElement is TypeElement && enclosedElement.getAnnotation(RemapType::class.java) == null) {
+                    processUnit(outputs, enclosedElement, toClassName + "$" + enclosedElement.simpleName, null)
                 }
             }
         }
@@ -94,6 +105,10 @@ class RemapProcessor : AbstractProcessor() {
 
     private fun getTypeElement(clazz: KClass<*>): TypeElement {
         return processingEnv.elementUtils.getTypeElement(clazz.java.name)!!
+    }
+
+    private fun printErrorMessage(message: String) {
+        processingEnv.messager.printMessage(Diagnostic.Kind.ERROR, message)
     }
 
     companion object {
