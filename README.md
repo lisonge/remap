@@ -111,6 +111,8 @@ public interface IPackageManager extends IInterface {
 
 getInstalledPackagesV17 is a hidden overload conflict method, it will be remapped to getInstalledPackages.
 
+you can check its signature changes at <https://diff.songe.li/i/IPackageManager.getInstalledPackages>
+
 ```kotlin
 // app/src/main/kotlin/example/app/Example.kt
 package example.app
