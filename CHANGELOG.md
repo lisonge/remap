@@ -1,3 +1,3 @@
 # What's Changed
 
-- first release
+- fix: inner type
