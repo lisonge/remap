@@ -1,7 +1,7 @@
 [versions]
-kotlin = "2.3.20"
-agp = "9.1.0"
-asm = "9.9.1"
+kotlin = "2.3.21"
+agp = "9.2.1"
+asm = "9.10.1"
 
 [libraries]
 asm-commons = { group = "org.ow2.asm", name = "asm-commons", version.ref = "asm" }
