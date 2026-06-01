@@ -1,3 +1,3 @@
 # What's Changed
 
-- fix: inner type
+- fix: improve remap annotation validation
