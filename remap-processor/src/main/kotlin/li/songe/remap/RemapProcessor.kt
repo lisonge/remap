@@ -26,25 +26,42 @@ class RemapProcessor : AbstractProcessor() {
             typeElement as TypeElement
             val toClassName = findAnnotationValue(typeElement, typeAnnElement)
             if (parseClassName(typeElement) == toClassName) {
-                printErrorMessage("the type $toClassName by RemapType parameter must be different type")
+                printErrorMessage("the RemapType parameter of type ${typeElement.simpleName} can not use self", typeElement)
+                return true
             }
             results.add(Triple(typeElement, toClassName, ArrayList()))
         }
         roundEnv.getElementsAnnotatedWith(methodAnnElement).forEach { methodElement ->
             methodElement as ExecutableElement
             val toMethodName = findAnnotationValue(methodElement, methodAnnElement)
+            if (!isValidJavaMethodName(toMethodName)) {
+                printErrorMessage(
+                    "the RemapMethod parameter of method ${methodElement.simpleName} must be a valid Java method name",
+                    methodElement
+                )
+                return true
+            }
             if (methodElement.simpleName.contentEquals(toMethodName)) {
-                printErrorMessage("the method ${methodElement.simpleName} by RemapMethod parameter must be different name")
+                printErrorMessage(
+                    "the RemapMethod parameter of method ${methodElement.simpleName} can not use self",
+                    methodElement
+                )
+                return true
+            }
+            val parent = methodElement.enclosingElement as TypeElement
+            val sameNameMethodCount = parent.enclosedElements.count {
+                it is ExecutableElement && it.simpleName.contentEquals(methodElement.simpleName)
+            }
+            if (sameNameMethodCount > 1) {
+                printErrorMessage(
+                    "the method ${methodElement.simpleName} by RemapMethod annotated can not use overload",
+                    methodElement
+                )
                 return true
             }
             val pair = methodElement to toMethodName
-            val parent = methodElement.enclosingElement as TypeElement
             val list = results.find { it.first == parent }?.third
             if (list != null) {
-                if (list.any { it.first.simpleName.contentEquals(methodElement.simpleName) }) {
-                    printErrorMessage("the method ${methodElement.simpleName} by RemapMethod annotated is not supported overload")
-                    return true
-                }
                 list.add(pair)
             } else {
                 results.add(Triple(parent, null, mutableListOf(pair)))
@@ -107,8 +124,8 @@ class RemapProcessor : AbstractProcessor() {
         return processingEnv.elementUtils.getTypeElement(clazz.java.name)!!
     }
 
-    private fun printErrorMessage(message: String) {
-        processingEnv.messager.printMessage(Diagnostic.Kind.ERROR, message)
+    private fun printErrorMessage(message: String, element: Element) {
+        processingEnv.messager.printMessage(Diagnostic.Kind.ERROR, message, element)
     }
 
     companion object {
@@ -128,6 +145,10 @@ class RemapProcessor : AbstractProcessor() {
                 is DeclaredType -> parseClassName(value.asElement()) // type
                 else -> error("Unsupported annotation value $value")
             }
+        }
+
+        private fun isValidJavaMethodName(name: String): Boolean {
+            return SourceVersion.isIdentifier(name) && !SourceVersion.isKeyword(name)
         }
     }
 }
