@@ -7,6 +7,7 @@ A Gradle plugin that uses ASM bytecode transformation to enable compile-time acc
 
 - **RemapType**: Remap a type to another type for access hidden types.
 - **RemapMethod**: Remap a method to another method for access hidden overload conflict methods.
+- **RemapStub**: Declare non-inlineable values for fields in compile-time API stubs.
 
 ## Usage
 
@@ -85,6 +86,28 @@ fun test(manger: AppOpsManager){
     (manger as AppOpsManagerHidden).clearHistory() // will Clears all app ops history
 }
 ```
+
+## Access hidden interface fields
+
+Interface fields are implicitly `static final` and require an initializer. Use
+`RemapStub.value()` to prevent the compiler from inlining a placeholder value.
+
+```java
+// hidden_api/src/main/java/android/os/IBinderHidden.java
+package android.os;
+
+import li.songe.remap.RemapStub;
+import li.songe.remap.RemapType;
+
+@RemapType(IBinder.class)
+public interface IBinderHidden {
+    int SHELL_COMMAND_TRANSACTION = RemapStub.value();
+}
+```
+
+`RemapStub.value()` always throws if evaluated. It must only be used in API
+stubs supplied through `compileOnly`, whose field references are rewritten by
+the Remap Gradle plugin before runtime.
 
 ## Access hidden overload conflict methods
 

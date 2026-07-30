@@ -8,6 +8,10 @@ dependencies {
     implementation(project(":remap-shared"))
     compileOnly(libs.agp.api)
     implementation(libs.asm.commons)
+
+    testImplementation(project(":remap-annotation"))
+    testImplementation(libs.agp.api)
+    testImplementation(kotlin("test"))
 }
 
 gradlePlugin {
@@ -19,4 +23,8 @@ gradlePlugin {
             implementationClass = "$id.RemapPlugin"
         }
     }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }

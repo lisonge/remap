@@ -1,0 +1,149 @@
+package li.songe.remap
+
+import com.android.build.api.instrumentation.ClassContext
+import com.android.build.api.instrumentation.ClassData
+import org.objectweb.asm.ClassReader
+import org.objectweb.asm.ClassVisitor
+import org.objectweb.asm.ClassWriter
+import org.objectweb.asm.FieldVisitor
+import org.objectweb.asm.MethodVisitor
+import org.objectweb.asm.Opcodes
+import org.objectweb.asm.Type
+import org.objectweb.asm.commons.ClassRemapper
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+
+class RemapStubTest {
+
+    @Test
+    fun `value fails when evaluated`() {
+        val error = assertFailsWith<AssertionError> {
+            RemapStub.value<Any>()
+        }
+
+        assertEquals("Remap stub was evaluated before bytecode remapping", error.message)
+    }
+
+    @Test
+    fun `interface fields have no constant values`() {
+        val fieldValues = readClass(RemapStubFixture::class.java).fieldValues()
+
+        assertEquals(
+            setOf(
+                "BYTE_VALUE",
+                "SHORT_VALUE",
+                "INT_VALUE",
+                "LONG_VALUE",
+                "FLOAT_VALUE",
+                "DOUBLE_VALUE",
+                "CHAR_VALUE",
+                "BOOLEAN_VALUE",
+                "STRING_VALUE",
+                "OBJECT_VALUE",
+                "ARRAY_VALUE",
+            ),
+            fieldValues.keys,
+        )
+        fieldValues.values.forEach(::assertNull)
+    }
+
+    @Test
+    fun `consumer field owners are remapped`() {
+        val fixtureName = Type.getInternalName(RemapStubFixture::class.java)
+        val targetName = "android/os/IBinder"
+        val originalClass = readClass(RemapStubConsumer::class.java)
+
+        assertEquals(
+            listOf(
+                FieldAccess(Opcodes.GETSTATIC, fixtureName, "INT_VALUE", "I"),
+                FieldAccess(Opcodes.GETSTATIC, fixtureName, "STRING_VALUE", "Ljava/lang/String;"),
+            ),
+            originalClass.fieldAccesses(),
+        )
+
+        val context = object : ClassContext {
+            override val currentClassData = classData(RemapStubConsumer::class.java.name)
+
+            override fun loadClassData(className: String): ClassData? {
+                return if (className == getMetaClassName(fixtureName)) {
+                    classData(className, listOf(buildTypeName("android.os.IBinder")))
+                } else {
+                    null
+                }
+            }
+        }
+        val writer = ClassWriter(0)
+        originalClass.accept(ClassRemapper(writer, RemapRemapper(context)), 0)
+
+        assertEquals(
+            listOf(
+                FieldAccess(Opcodes.GETSTATIC, targetName, "INT_VALUE", "I"),
+                FieldAccess(Opcodes.GETSTATIC, targetName, "STRING_VALUE", "Ljava/lang/String;"),
+            ),
+            ClassReader(writer.toByteArray()).fieldAccesses(),
+        )
+    }
+
+    private fun readClass(type: Class<*>): ClassReader {
+        val resourceName = type.name.replace('.', '/') + ".class"
+        val bytes = requireNotNull(type.classLoader.getResourceAsStream(resourceName)) {
+            "Missing class resource $resourceName"
+        }.use { it.readBytes() }
+        return ClassReader(bytes)
+    }
+
+    private fun ClassReader.fieldValues(): Map<String, Any?> {
+        val values = linkedMapOf<String, Any?>()
+        accept(object : ClassVisitor(Opcodes.ASM9) {
+            override fun visitField(
+                access: Int,
+                name: String,
+                descriptor: String,
+                signature: String?,
+                value: Any?,
+            ): FieldVisitor? {
+                values[name] = value
+                return null
+            }
+        }, ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES)
+        return values
+    }
+
+    private fun ClassReader.fieldAccesses(): List<FieldAccess> {
+        val accesses = mutableListOf<FieldAccess>()
+        accept(object : ClassVisitor(Opcodes.ASM9) {
+            override fun visitMethod(
+                access: Int,
+                name: String,
+                descriptor: String,
+                signature: String?,
+                exceptions: Array<out String>?,
+            ): MethodVisitor {
+                return object : MethodVisitor(Opcodes.ASM9) {
+                    override fun visitFieldInsn(opcode: Int, owner: String, name: String, descriptor: String) {
+                        accesses += FieldAccess(opcode, owner, name, descriptor)
+                    }
+                }
+            }
+        }, ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES)
+        return accesses
+    }
+
+    private fun classData(name: String, annotations: List<String> = emptyList()): ClassData {
+        return object : ClassData {
+            override val className = name
+            override val classAnnotations = annotations
+            override val interfaces = emptyList<String>()
+            override val superClasses = emptyList<String>()
+        }
+    }
+
+    private data class FieldAccess(
+        val opcode: Int,
+        val owner: String,
+        val name: String,
+        val descriptor: String,
+    )
+}
