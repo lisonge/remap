@@ -1,3 +1,3 @@
 # What's Changed
 
-- fix: improve remap annotation validation
+- fix: support hidden interface fields with RemapStub
