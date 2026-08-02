@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "li.songe.remap"
-    version = "0.1.3" + if (rootProject.file("local.properties").isFile) "-SNAPSHOT" else ""
+    version = "0.1.4" + if (rootProject.file("local.properties").isFile) "-SNAPSHOT" else ""
 }
 
 subprojects {

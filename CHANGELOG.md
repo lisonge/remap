@@ -1,3 +1,3 @@
 # What's Changed
 
-- fix: support hidden interface fields with RemapStub
+- fix: reject RemapType class/interface mismatches at compile time
