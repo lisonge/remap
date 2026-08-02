@@ -24,16 +24,25 @@ class RemapProcessor : AbstractProcessor() {
         val results = mutableListOf<Triple<TypeElement, String?, MutableList<Pair<ExecutableElement, String>>>>()
         roundEnv.getElementsAnnotatedWith(typeAnnElement).forEach { typeElement ->
             typeElement as TypeElement
-            val toClassName = findAnnotationValue(typeElement, typeAnnElement)
+            val toTypeElement = findAnnotationTypeValue(typeElement, typeAnnElement)
+            val toClassName = parseClassName(toTypeElement)
             if (parseClassName(typeElement) == toClassName) {
                 printErrorMessage("the RemapType parameter of type ${typeElement.simpleName} can not use self", typeElement)
+                return true
+            }
+            if (typeElement.kind.isInterface != toTypeElement.kind.isInterface) {
+                printErrorMessage(
+                    "the type ${typeElement.simpleName} annotated by RemapType must have the same kind " +
+                        "(class or interface) as ${toTypeElement.simpleName}",
+                    typeElement,
+                )
                 return true
             }
             results.add(Triple(typeElement, toClassName, ArrayList()))
         }
         roundEnv.getElementsAnnotatedWith(methodAnnElement).forEach { methodElement ->
             methodElement as ExecutableElement
-            val toMethodName = findAnnotationValue(methodElement, methodAnnElement)
+            val toMethodName = findAnnotationStringValue(methodElement, methodAnnElement)
             if (!isValidJavaMethodName(toMethodName)) {
                 printErrorMessage(
                     "the RemapMethod parameter of method ${methodElement.simpleName} must be a valid Java method name",
@@ -135,16 +144,25 @@ class RemapProcessor : AbstractProcessor() {
             else -> element.simpleName.toString()
         }
 
+        private fun findAnnotationTypeValue(
+            element: Element,
+            annotationElement: TypeElement,
+        ): TypeElement {
+            val value = findAnnotationValue(element, annotationElement)
+            return (value as DeclaredType).asElement() as TypeElement
+        }
+
+        private fun findAnnotationStringValue(
+            element: Element,
+            annotationElement: TypeElement,
+        ): String = findAnnotationValue(element, annotationElement) as String
+
         private fun findAnnotationValue(
             element: Element,
             annotationElement: TypeElement,
-        ): String {
+        ): Any {
             val mirror = element.annotationMirrors.find { it.annotationType.asElement() == annotationElement }!!
-            return when (val value = mirror.elementValues.values.single().value) {
-                is String -> value // method
-                is DeclaredType -> parseClassName(value.asElement()) // type
-                else -> error("Unsupported annotation value $value")
-            }
+            return mirror.elementValues.values.single().value
         }
 
         private fun isValidJavaMethodName(name: String): Boolean {

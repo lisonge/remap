@@ -7,4 +7,10 @@ dependencies {
     implementation(project(":remap-annotation"))
     implementation(project(":remap-shared"))
     implementation(libs.asm.commons)
+
+    testImplementation(kotlin("test"))
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
