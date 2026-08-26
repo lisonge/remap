@@ -1,19 +1,16 @@
 package li.songe.remap
 
-import com.android.build.api.instrumentation.ClassContext
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.commons.Remapper
 
-class RemapRemapper(val context: ClassContext) : Remapper(Opcodes.ASM9) {
+class RemapRemapper(private val index: RemapIndex) : Remapper(Opcodes.ASM9) {
 
     override fun map(name: String): String {
-        val data = context.loadClassData(getMetaClassName(name))
-        return parseTypeName(data?.classAnnotations) ?: name
+        return index.typeMappings[name] ?: name
     }
 
     override fun mapMethodName(owner: String, name: String, descriptor: String): String {
-        val data = context.loadClassData(getMetaClassName(owner))
-        return parseMethodName(data?.classAnnotations, name) ?: name
+        return index.methodMappings[owner]?.get(name) ?: name
     }
 
     override fun mapInnerClassName(name: String, ownerName: String?, innerName: String): String {

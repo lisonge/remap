@@ -1,7 +1,5 @@
 package li.songe.remap
 
-import com.android.build.api.instrumentation.ClassContext
-import com.android.build.api.instrumentation.ClassData
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassVisitor
 import org.objectweb.asm.ClassWriter
@@ -10,12 +8,19 @@ import org.objectweb.asm.MethodVisitor
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
 import org.objectweb.asm.commons.ClassRemapper
+import java.lang.reflect.Modifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class RemapStubTest {
+
+    @Test
+    fun `factory has no serializable instance state`() {
+        assertTrue(RemapFactory::class.java.declaredFields.all { Modifier.isStatic(it.modifiers) })
+    }
 
     @Test
     fun `value fails when evaluated`() {
@@ -63,19 +68,12 @@ class RemapStubTest {
             originalClass.fieldAccesses(),
         )
 
-        val context = object : ClassContext {
-            override val currentClassData = classData(RemapStubConsumer::class.java.name)
-
-            override fun loadClassData(className: String): ClassData? {
-                return if (className == getMetaClassName(fixtureName)) {
-                    classData(className, listOf(buildTypeName("android.os.IBinder")))
-                } else {
-                    null
-                }
-            }
-        }
+        val index = RemapIndex(
+            typeMappings = mapOf(fixtureName to targetName),
+            methodMappings = emptyMap(),
+        )
         val writer = ClassWriter(0)
-        originalClass.accept(ClassRemapper(writer, RemapRemapper(context)), 0)
+        originalClass.accept(ClassRemapper(writer, RemapRemapper(index)), 0)
 
         assertEquals(
             listOf(
@@ -84,6 +82,25 @@ class RemapStubTest {
             ),
             ClassReader(writer.toByteArray()).fieldAccesses(),
         )
+    }
+
+    @Test
+    fun `type and method remapping use the aggregate index`() {
+        val sourceName = "test/Source"
+        val missingName = "test/Missing"
+        val remapper = RemapRemapper(
+            RemapIndex(
+                typeMappings = mapOf(sourceName to "test/Target"),
+                methodMappings = mapOf(
+                    sourceName to mapOf("sourceMethod" to "targetMethod"),
+                ),
+            ),
+        )
+
+        assertEquals("test/Target", remapper.map(sourceName))
+        assertEquals("targetMethod", remapper.mapMethodName(sourceName, "sourceMethod", "()V"))
+        assertEquals(missingName, remapper.map(missingName))
+        assertEquals("missingMethod", remapper.mapMethodName(missingName, "missingMethod", "()V"))
     }
 
     private fun readClass(type: Class<*>): ClassReader {
@@ -129,15 +146,6 @@ class RemapStubTest {
             }
         }, ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES)
         return accesses
-    }
-
-    private fun classData(name: String, annotations: List<String> = emptyList()): ClassData {
-        return object : ClassData {
-            override val className = name
-            override val classAnnotations = annotations
-            override val interfaces = emptyList<String>()
-            override val superClasses = emptyList<String>()
-        }
     }
 
     private data class FieldAccess(

@@ -14,7 +14,7 @@ A Gradle plugin that uses ASM bytecode transformation to enable compile-time acc
 ```toml
 # gradle/libs.versions.toml
 [versions]
-loc = "<version>" # https://github.com/lisonge/remap/releases
+remap = "<version>" # https://github.com/lisonge/remap/releases
 
 [libraries]
 remap-processor = { module = "li.songe.remap:remap-processor", version.ref = "remap" }
@@ -27,7 +27,7 @@ remap = { id = "li.songe.remap", version.ref = "remap" }
 ```kotlin
 // build.gradle.kts
 plugins {
-    alias(libs.plugins.loc) apply false
+    alias(libs.plugins.remap) apply false
 }
 ```
 
@@ -46,9 +46,26 @@ plugins {
 }
 
 dependencies {
-    compileOnly(project(":hidden_api"))
+    remapApi(project(":hidden_api"))
 }
 ```
+
+Apply the Remap plugin to every Android module whose compiled code references
+hidden API stubs. The plugin only transforms classes from the current module;
+it does not transform dependency modules. Declare exactly one hidden API module
+with `remapApi(project(...))`. The plugin supplies this dependency to
+`compileOnly`; it is not packaged into the application at runtime. The dependency
+is non-transitive, so keep all remap stubs in that configured module. Non-Android
+dependency modules are not transformed and must not reference the stubs.
+
+The annotation processor writes all type and method mappings to a deterministic
+index in the stub module's compile output. For each Android variant, the plugin
+resolves only the configured module's matching, non-transitive compile artifact
+and reads the index at its fixed path. It does not scan the rest of the variant's
+compile classpath or load class metadata.
+
+The index filename carries its format version. Its contents are deterministic,
+BOM-free UTF-8 TSV records with `\n` line endings and no file header.
 
 ## Access hidden types
 

@@ -1,8 +1,5 @@
 package li.songe.remap
 
-import org.objectweb.asm.ClassWriter
-import org.objectweb.asm.Opcodes
-import org.objectweb.asm.Type
 import javax.annotation.processing.AbstractProcessor
 import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.SourceVersion
@@ -12,13 +9,20 @@ import javax.lang.model.element.PackageElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import javax.tools.Diagnostic
-import javax.tools.JavaFileObject
+import javax.tools.StandardLocation
 import kotlin.reflect.KClass
 
 class RemapProcessor : AbstractProcessor() {
+    private val indexBuilder = RemapIndexBuilder()
+    private var indexWritten = false
+
     override fun getSupportedSourceVersion(): SourceVersion = SourceVersion.latestSupported()
     override fun getSupportedAnnotationTypes() = setOf(RemapType::class.java.name, RemapMethod::class.java.name)
     override fun process(annotations: Set<TypeElement>, roundEnv: RoundEnvironment): Boolean {
+        if (roundEnv.processingOver()) {
+            writeIndex()
+            return true
+        }
         val typeAnnElement = getTypeElement(RemapType::class)
         val methodAnnElement = getTypeElement(RemapMethod::class)
         val results = mutableListOf<Triple<TypeElement, String?, MutableList<Pair<ExecutableElement, String>>>>()
@@ -76,56 +80,45 @@ class RemapProcessor : AbstractProcessor() {
                 results.add(Triple(parent, null, mutableListOf(pair)))
             }
         }
-        val outputs = hashMapOf<String, Pair<ClassWriter, JavaFileObject>>()
         results.forEach { (typeElement, toClassName, methods) ->
-            processUnit(outputs, typeElement, toClassName, methods)
-        }
-        outputs.values.forEach { (metadataWriter, metadataFile) ->
-            metadataWriter.visitEnd()
-            metadataFile.openOutputStream().use {
-                it.write(metadataWriter.toByteArray())
-            }
+            processUnit(typeElement, toClassName, methods)
         }
         return true
     }
 
     private fun processUnit(
-        outputs: MutableMap<String, Pair<ClassWriter, JavaFileObject>>,
         typeElement: TypeElement,
         toClassName: String?,
         methods: List<Pair<ExecutableElement, String>>?,
     ) {
-        val fromClassName = parseClassName(typeElement)
-
-        val metadataName = getMetaClassName(fromClassName)
-        val (metadataWriter) = outputs.getOrPut(metadataName) {
-            ClassWriter(0).apply {
-                visit(
-                    Opcodes.V1_8,
-                    Opcodes.ACC_FINAL or Opcodes.ACC_PRIVATE or Opcodes.ACC_SUPER,
-                    metadataName.replace('.', '/'),
-                    null,
-                    Type.getInternalName(Any::class.java),
-                    null,
-                )
-            } to processingEnv.filer.createClassFile(metadataName, typeElement)
-        }
+        val fromClassName = parseClassName(typeElement).toInternalName()
 
         if (toClassName != null) {
-            metadataWriter.visitAnnotation(toDescriptor(buildTypeName(toClassName)), false).visitEnd()
+            indexBuilder.putType(fromClassName, toClassName.toInternalName())
         }
         methods?.forEach { (methodElement, toMethodName) ->
             val fromMethodName = methodElement.simpleName.toString()
-            metadataWriter.visitAnnotation(toDescriptor(buildMethodName(fromMethodName, toMethodName)), false)
-                .visitEnd()
+            indexBuilder.putMethod(fromClassName, fromMethodName, toMethodName)
         }
 
         if (toClassName != null) {
             typeElement.enclosedElements.forEach { enclosedElement ->
                 if (enclosedElement is TypeElement && enclosedElement.getAnnotation(RemapType::class.java) == null) {
-                    processUnit(outputs, enclosedElement, toClassName + "$" + enclosedElement.simpleName, null)
+                    processUnit(enclosedElement, toClassName + "$" + enclosedElement.simpleName, null)
                 }
             }
+        }
+    }
+
+    private fun writeIndex() {
+        if (indexWritten) return
+        indexWritten = true
+        processingEnv.filer.createResource(
+            StandardLocation.CLASS_OUTPUT,
+            "",
+            REMAP_INDEX_PATH,
+        ).openOutputStream().bufferedWriter(Charsets.UTF_8).use {
+            it.write(indexBuilder.build().encode())
         }
     }
 
@@ -138,6 +131,8 @@ class RemapProcessor : AbstractProcessor() {
     }
 
     companion object {
+        private fun String.toInternalName(): String = replace('.', '/')
+
         private fun parseClassName(element: Element): String = when (val enclosing = element.enclosingElement) {
             is TypeElement -> parseClassName(enclosing) + "$" + element.simpleName
             is PackageElement -> enclosing.qualifiedName.toString() + "." + element.simpleName
