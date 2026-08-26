@@ -32,7 +32,7 @@ plugins {
 ```
 
 ```kotlin
-// hidden_api/build.gradle.kts
+// hidden-api/build.gradle.kts
 dependencies {
     compileOnly(libs.remap.annotation)
     annotationProcessor(libs.remap.processor)
@@ -46,7 +46,7 @@ plugins {
 }
 
 dependencies {
-    remapApi(project(":hidden_api"))
+    remapApi(project(":hidden-api"))
 }
 ```
 
@@ -70,7 +70,7 @@ BOM-free UTF-8 TSV records with `\n` line endings and no file header.
 ## Access hidden types
 
 ```java
-// hidden_api/src/main/java/android/app/AppOpsManagerHidden.java
+// hidden-api/src/main/java/android/app/AppOpsManagerHidden.java
 package android.app;
 
 import android.os.Build;
@@ -110,7 +110,7 @@ Interface fields are implicitly `static final` and require an initializer. Use
 `RemapStub.value()` to prevent the compiler from inlining a placeholder value.
 
 ```java
-// hidden_api/src/main/java/android/os/IBinderHidden.java
+// hidden-api/src/main/java/android/os/IBinderHidden.java
 package android.os;
 
 import li.songe.remap.RemapStub;
@@ -129,7 +129,7 @@ the Remap Gradle plugin before runtime.
 ## Access hidden overload conflict methods
 
 ```java
-// hidden_api/src/main/java/android/content/IPackageManager.java
+// hidden-api/src/main/java/android/content/IPackageManager.java
 package android.content;
 
 import android.os.IInterface;
