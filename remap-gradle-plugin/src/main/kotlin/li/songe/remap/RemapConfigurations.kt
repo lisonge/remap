@@ -33,8 +33,13 @@ internal fun Project.createRemapApiConfiguration(): Configuration {
             "$REMAP_API_CONFIGURATION project dependency must not be removed or replaced"
         }
     }
-    configurations.getByName("compileOnly").extendsFrom(remapApi)
     return remapApi
+}
+
+internal fun Project.connectRemapApi(remapApi: Configuration, compileOnlyName: String) {
+    configurations.matching { it.name == compileOnlyName }.configureEach {
+        it.extendsFrom(remapApi)
+    }
 }
 
 internal fun Project.createRemapIndexClasspath(

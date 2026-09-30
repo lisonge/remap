@@ -30,7 +30,7 @@ jobs:
       - run: chmod 777 ./gradlew
 
       - name: Publish to Maven Central
-        run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
+        run: ./gradlew verifyReleaseVersion publishAndReleaseToMavenCentral --no-configuration-cache
 
       - uses: actions/create-release@v1
         env:

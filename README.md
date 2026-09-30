@@ -50,13 +50,81 @@ dependencies {
 }
 ```
 
+## Kotlin / Compose Multiplatform
+
+Remap supports the Android target provided by
+`com.android.kotlin.multiplatform.library`. Apply it to the KMP/CMP module and
+keep `remapApi` in the module's top-level `dependencies` block:
+
+```kotlin
+plugins {
+    kotlin("multiplatform")
+    id("com.android.kotlin.multiplatform.library")
+    id("li.songe.remap")
+}
+
+kotlin {
+    android {
+        namespace = "example.shared"
+        compileSdk = 36
+    }
+    jvm()
+}
+
+dependencies {
+    remapApi(project(":hidden-api"))
+}
+```
+
+The plugin connects `remapApi` to `androidMainCompileOnly`. Use the stubs in
+`src/androidMain`; they are not supplied to `commonMain`, JVM, or native targets.
+Only the Android target's project classes are transformed. Compose is not
+required. Plugin declaration order does not matter.
+
+Keep the stubs and annotation processor in a separate `:hidden-api` module as
+shown above. When that Android library has build types or product flavors,
+configure `kotlin.android.localDependencySelection` as needed; Remap uses the
+Android variant's attributes to resolve the index dependency.
+
+Host/device test classes are not separately instrumented by Remap.
+
+The KMP path uses the project-scoped Android classes artifact transformation.
+AGP 9.2.1 and 9.4.1 expose the instrumentation API on KMP variants but do not
+execute its ASM task for their main classes. Ordinary Android modules continue
+to use the instrumentation API. Both paths use the same Remap mappings.
+
+KMP transformations screen added or changed classes before running ASM remapping.
+Unrelated classes and resources retain their original bytes. When AGP's internal
+directory transform interface is available, Remap publishes a separate classes
+directory and updates only changed entries, preserving downstream D8 incrementality.
+Compiler outputs are never modified. This compatibility bridge is tested with
+AGP 9.2.1 and 9.4.1; if the interface is unavailable, Remap logs a warning and
+falls back to the public single-JAR transform (with coarser downstream dex work).
+Incremental D8 execution also depends on AGP's dex/desugaring configuration;
+directory output removes Remap's single-JAR bottleneck where AGP supports it.
+
+Changed input JARs are rescanned in full and expanded into the output directory.
+Mapping changes or missing local state trigger a full rescan. Only actually
+rewritten classes get an additional local cache file. The disposable cache lives
+in `build/intermediates/remap/<task-name>/classes-state/`, with a `manifest-v3`
+and content-addressed `.class` files. Gradle `--info` logs class counts and
+screening, ASM, and output times (`output`). Unchanged builds skip the task; both
+output paths support Gradle's build cache and configuration cache.
+
+## Module boundaries
+
 Apply the Remap plugin to every Android module whose compiled code references
 hidden API stubs. The plugin only transforms classes from the current module;
 it does not transform dependency modules. Declare exactly one hidden API module
 with `remapApi(project(...))`. The plugin supplies this dependency to
 `compileOnly`; it is not packaged into the application at runtime. The dependency
 is non-transitive, so keep all remap stubs in that configured module. Non-Android
-dependency modules are not transformed and must not reference the stubs.
+targets are not transformed and must not reference the stubs.
+
+Remap rewrites JVM bytecode and generic signatures, not Kotlin Metadata. Keep
+mapped stub types out of APIs intended for consumers without Remap. Consumers
+that reference such signatures or inline bodies involving stubs also need
+Remap and the same stub dependency.
 
 The annotation processor writes all type and method mappings to a deterministic
 index in the stub module's compile output. For each Android variant, the plugin
@@ -172,6 +240,22 @@ fun test(manger: IPackageManager, flags: Long, userId: Int): List<PackageInfo> {
     }).list
 }
 ```
+
+## Development checks
+
+Run unit tests with `./gradlew test`. The Android/KMP integration fixture uses
+AGP 9.2.1, Kotlin 2.3.21, JDK 21, and Android SDK platform 36:
+
+```shell
+./gradlew :remap-gradle-plugin:integrationTest -PandroidSdk=/path/to/android-sdk
+```
+
+`ANDROID_HOME` or `ANDROID_SDK_ROOT` can supply the SDK path instead. The
+integration test checks AAR bytecode, cross-module Kotlin calls and inline
+bodies, JVM isolation, plugin order, configuration-cache reuse, build-cache
+restoration, class additions/deletions, and incremental downstream dexing.
+To check the newer toolchain, add `-PtestAgpVersion=9.4.1`,
+`-PtestKotlinVersion=2.4.20`, and `-PtestGradleVersion=9.7.1`.
 
 ## Thanks
 

@@ -12,6 +12,18 @@ import kotlin.test.assertTrue
 
 class RemapConfigurationsTest {
     @Test
+    fun `android dependency wiring is lazy and isolated from other platforms`() {
+        val project = ProjectBuilder.builder().build()
+        val remapApi = project.createRemapApiConfiguration()
+        project.connectRemapApi(remapApi, "androidMainCompileOnly")
+        val android = project.configurations.create("androidMainCompileOnly")
+        assertTrue(android.extendsFrom.contains(remapApi))
+        listOf("commonMainCompileOnly", "jvmMainCompileOnly", "androidRuntimeClasspath").forEach {
+            assertFalse(project.configurations.create(it).extendsFrom.contains(remapApi))
+        }
+    }
+
+    @Test
     fun `remap api supplies compile only and matching index artifact`() {
         val root = ProjectBuilder.builder().withName("root").build()
         val hiddenApi = ProjectBuilder.builder().withName("hidden-api").withParent(root).build()
@@ -21,6 +33,7 @@ class RemapConfigurationsTest {
         compileClasspath.attributes.attribute(flavor, "gkd")
 
         val remapApi = root.createRemapApiConfiguration()
+        root.connectRemapApi(remapApi, "compileOnly")
         val dependency = root.dependencies.project(mapOf("path" to hiddenApi.path))
         remapApi.dependencies.add(dependency)
         val indexClasspath = root.createRemapIndexClasspath(

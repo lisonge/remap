@@ -11,7 +11,13 @@ private const val MAX_MODIFIED_UTF8_BYTES = 65_535
 data class RemapIndex(
     val typeMappings: Map<String, String>,
     val methodMappings: Map<String, Map<String, String>>,
-)
+) {
+    val onlyAndroidMappings: Boolean =
+        typeMappings.keys.all(::isAndroidClass) && methodMappings.keys.all(::isAndroidClass)
+}
+
+private fun isAndroidClass(name: String): Boolean =
+    name.startsWith("android/") || name.startsWith("com/android/")
 
 class RemapIndexBuilder {
     private val typeMappings = hashMapOf<String, String>()

@@ -6,12 +6,19 @@ import org.objectweb.asm.commons.Remapper
 class RemapRemapper(private val index: RemapIndex) : Remapper(Opcodes.ASM9) {
 
     override fun map(name: String): String {
+        if (canSkipLookup(name)) return name
         return index.typeMappings[name] ?: name
     }
 
     override fun mapMethodName(owner: String, name: String, descriptor: String): String {
+        if (canSkipLookup(owner)) return name
         return index.methodMappings[owner]?.get(name) ?: name
     }
+
+    // Android-only indexes can reject most owners without hashing the whole name.
+    // This is a coarse filter: false positives still use the exact map lookup.
+    private fun canSkipLookup(name: String): Boolean = index.onlyAndroidMappings &&
+        (name.isEmpty() || (name[0] != 'a' && (name.length <= 4 || name[4] != 'a')))
 
     override fun mapInnerClassName(name: String, ownerName: String?, innerName: String): String {
         val result = super.mapInnerClassName(name, ownerName, innerName)

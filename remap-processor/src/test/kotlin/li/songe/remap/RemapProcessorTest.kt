@@ -78,7 +78,36 @@ class RemapProcessorTest {
         )
     }
 
-    private fun compile(sourceKind: String, targetKind: String, sourceBody: String = ""): CompilationResult {
+    @Test
+    fun `nested type overrides and method-only owners retain their mappings`() {
+        val result = compile("class", "class", """
+            class Nested { class Deep {} }
+            @RemapType(Target.class) static class Explicit {}
+            @RemapMethod("renamed") void original() {}
+            static class MethodsOnly { @RemapMethod("read") void fetch() {} }
+        """.trimIndent())
+        assertTrue(result.success, result.errors)
+        assertEquals(mapOf(
+            "test/Source" to "test/Target",
+            "test/Source\$Nested" to "test/Target\$Nested",
+            "test/Source\$Nested\$Deep" to "test/Target\$Nested\$Deep",
+            "test/Source\$Explicit" to "test/Target",
+            "test/Source\$MethodsOnly" to "test/Target\$MethodsOnly",
+        ), result.index?.typeMappings)
+        assertEquals(mapOf(
+            "test/Source" to mapOf("original" to "renamed"),
+            "test/Source\$MethodsOnly" to mapOf("fetch" to "read"),
+        ), result.index?.methodMappings)
+    }
+
+    @Test
+    fun `unnamed package uses valid binary names`() {
+        val result = compile("class", "class", "class Nested {}", packageName = "")
+        assertTrue(result.success, result.errors)
+        assertEquals(mapOf("Source" to "Target", "Source\$Nested" to "Target\$Nested"), result.index?.typeMappings)
+    }
+
+    private fun compile(sourceKind: String, targetKind: String, sourceBody: String = "", packageName: String = "test"): CompilationResult {
         val compiler = ToolProvider.getSystemJavaCompiler()
         val diagnostics = DiagnosticCollector<JavaFileObject>()
         val outputDirectory = createTempDirectory("remap-processor-test").toFile()
@@ -86,9 +115,9 @@ class RemapProcessorTest {
             compiler.getStandardFileManager(diagnostics, null, null).use { fileManager ->
                 fileManager.setLocation(StandardLocation.CLASS_OUTPUT, listOf(outputDirectory))
                 val source = SourceFile(
-                    "test.Source",
+                    if (packageName.isEmpty()) "Source" else "$packageName.Source",
                     """
-                        package test;
+                        ${if (packageName.isEmpty()) "" else "package $packageName;"}
 
                         import li.songe.remap.RemapMethod;
                         import li.songe.remap.RemapType;

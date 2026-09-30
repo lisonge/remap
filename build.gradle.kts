@@ -6,9 +6,23 @@ plugins {
     alias(libs.plugins.maven.publish) apply false
 }
 
+val isCi = providers.environmentVariable("CI").isPresent
 allprojects {
     group = "li.songe.remap"
-    version = "0.1.5" + if (rootProject.file("local.properties").isFile) "-SNAPSHOT" else ""
+    version = "0.1.6" + if (isCi) "" else "-SNAPSHOT"
+}
+
+val releaseTag = providers.environmentVariable("GITHUB_REF_NAME")
+val projectReleaseVersion = version.toString()
+tasks.register("verifyReleaseVersion") {
+    group = "verification"
+    description = "Checks that the release tag matches the project version."
+    doLast {
+        check(!projectReleaseVersion.endsWith("-SNAPSHOT")) { "Cannot release a SNAPSHOT version" }
+        check(releaseTag.orNull == "v$projectReleaseVersion") {
+            "Expected tag v$projectReleaseVersion, got ${releaseTag.orNull ?: "<missing>"}"
+        }
+    }
 }
 
 subprojects {

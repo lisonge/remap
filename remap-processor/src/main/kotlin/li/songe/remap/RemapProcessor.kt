@@ -5,7 +5,6 @@ import javax.annotation.processing.RoundEnvironment
 import javax.lang.model.SourceVersion
 import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
-import javax.lang.model.element.PackageElement
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import javax.tools.Diagnostic
@@ -25,12 +24,12 @@ class RemapProcessor : AbstractProcessor() {
         }
         val typeAnnElement = getTypeElement(RemapType::class)
         val methodAnnElement = getTypeElement(RemapMethod::class)
-        val results = mutableListOf<Triple<TypeElement, String?, MutableList<Pair<ExecutableElement, String>>>>()
+        val results = linkedMapOf<TypeElement, TypeMapping>()
         roundEnv.getElementsAnnotatedWith(typeAnnElement).forEach { typeElement ->
             typeElement as TypeElement
             val toTypeElement = findAnnotationTypeValue(typeElement, typeAnnElement)
-            val toClassName = parseClassName(toTypeElement)
-            if (parseClassName(typeElement) == toClassName) {
+            val toClassName = binaryName(toTypeElement)
+            if (binaryName(typeElement) == toClassName) {
                 printErrorMessage("the RemapType parameter of type ${typeElement.simpleName} can not use self", typeElement)
                 return true
             }
@@ -42,7 +41,7 @@ class RemapProcessor : AbstractProcessor() {
                 )
                 return true
             }
-            results.add(Triple(typeElement, toClassName, ArrayList()))
+            results[typeElement] = TypeMapping(toClassName)
         }
         roundEnv.getElementsAnnotatedWith(methodAnnElement).forEach { methodElement ->
             methodElement as ExecutableElement
@@ -72,16 +71,10 @@ class RemapProcessor : AbstractProcessor() {
                 )
                 return true
             }
-            val pair = methodElement to toMethodName
-            val list = results.find { it.first == parent }?.third
-            if (list != null) {
-                list.add(pair)
-            } else {
-                results.add(Triple(parent, null, mutableListOf(pair)))
-            }
+            results.getOrPut(parent) { TypeMapping(null) }.methods.add(methodElement to toMethodName)
         }
-        results.forEach { (typeElement, toClassName, methods) ->
-            processUnit(typeElement, toClassName, methods)
+        results.forEach { (typeElement, mapping) ->
+            processUnit(typeElement, mapping.targetName, mapping.methods)
         }
         return true
     }
@@ -89,14 +82,14 @@ class RemapProcessor : AbstractProcessor() {
     private fun processUnit(
         typeElement: TypeElement,
         toClassName: String?,
-        methods: List<Pair<ExecutableElement, String>>?,
+        methods: List<Pair<ExecutableElement, String>> = emptyList(),
     ) {
-        val fromClassName = parseClassName(typeElement).toInternalName()
+        val fromClassName = binaryName(typeElement).toInternalName()
 
         if (toClassName != null) {
             indexBuilder.putType(fromClassName, toClassName.toInternalName())
         }
-        methods?.forEach { (methodElement, toMethodName) ->
+        methods.forEach { (methodElement, toMethodName) ->
             val fromMethodName = methodElement.simpleName.toString()
             indexBuilder.putMethod(fromClassName, fromMethodName, toMethodName)
         }
@@ -104,7 +97,7 @@ class RemapProcessor : AbstractProcessor() {
         if (toClassName != null) {
             typeElement.enclosedElements.forEach { enclosedElement ->
                 if (enclosedElement is TypeElement && enclosedElement.getAnnotation(RemapType::class.java) == null) {
-                    processUnit(enclosedElement, toClassName + "$" + enclosedElement.simpleName, null)
+                    processUnit(enclosedElement, toClassName + "$" + enclosedElement.simpleName)
                 }
             }
         }
@@ -130,14 +123,16 @@ class RemapProcessor : AbstractProcessor() {
         processingEnv.messager.printMessage(Diagnostic.Kind.ERROR, message, element)
     }
 
+    private data class TypeMapping(
+        val targetName: String?,
+        val methods: MutableList<Pair<ExecutableElement, String>> = mutableListOf(),
+    )
+
+    private fun binaryName(element: TypeElement): String =
+        processingEnv.elementUtils.getBinaryName(element).toString()
+
     companion object {
         private fun String.toInternalName(): String = replace('.', '/')
-
-        private fun parseClassName(element: Element): String = when (val enclosing = element.enclosingElement) {
-            is TypeElement -> parseClassName(enclosing) + "$" + element.simpleName
-            is PackageElement -> enclosing.qualifiedName.toString() + "." + element.simpleName
-            else -> element.simpleName.toString()
-        }
 
         private fun findAnnotationTypeValue(
             element: Element,
