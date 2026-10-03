@@ -43,10 +43,16 @@ Read [failure patterns](references/failure-cases.md) as needed for callbacks los
 
 Upstream: [lisonge/remap](https://github.com/lisonge/remap/tree/main/docs/skills/android-hidden-api-r8).
 
-When asked to update this skill, run the following from the consuming project's root if it was installed with the skills CLI:
+When asked to update this skill, use either command from the consuming project's root if it was installed with the skills CLI:
 
 ```shell
 npx skills update android-hidden-api-r8
+```
+
+Or with pnpm:
+
+```shell
+pnpm dlx skills update android-hidden-api-r8
 ```
 
 For a manually copied installation, compare the installed directory with upstream and merge updates to `SKILL.md` and `references/`. Preserve project-specific customizations. Review the resulting diff and reconcile any affected guidance in the project's `AGENTS.md` without replacing unrelated instructions. Updating the skill does not automatically update that file. Do not update the skill as part of an ordinary R8 investigation unless requested.

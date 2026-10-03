@@ -273,10 +273,16 @@ Remap repository skill.
 
 #### Install the skill in your project
 
-From the **root of the project consuming Remap**, run:
+From the **root of the project consuming Remap**, use either command:
 
 ```shell
 npx skills add https://github.com/lisonge/remap/tree/main/docs/skills/android-hidden-api-r8
+```
+
+Or with pnpm:
+
+```shell
+pnpm dlx skills add https://github.com/lisonge/remap/tree/main/docs/skills/android-hidden-api-r8
 ```
 
 Follow the prompts to select your AI tool and install the skill and its
@@ -313,7 +319,7 @@ them with contributors.
 Alternatively, ask your project's AI assistant to perform the setup:
 
 > Read https://github.com/lisonge/remap#hidden-apis-and-r8, install its android-hidden-api-r8
-> skill using the documented npx skills command for this project, and merge
+> skill using the documented npx or pnpm dlx command for this project, and merge
 > the trigger guidance into this project's AGENTS.md. Adapt it to this project's
 > structure and preserve existing rules. Keep the setup project-local.
 
