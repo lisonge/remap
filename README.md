@@ -241,6 +241,82 @@ fun test(manger: IPackageManager, flags: Long, userId: Int): List<PackageInfo> {
 }
 ```
 
+## Hidden APIs and R8
+
+When Android calls your implementation of a hidden interface or superclass,
+R8 needs to understand that runtime contract. Successful compilation or a
+working Debug build does not prove that the callback will survive optimization.
+Calling a system hidden API and implementing a callback invoked by the system
+are different cases.
+
+In multi-module and KMP applications, verify that the relevant hidden-api stubs
+reach the **application module that runs R8**. A library's `compileOnly` or
+`androidMainCompileOnly` dependency does not establish that the final R8 task
+receives those declarations. For example, an application may need its own
+`compileOnly(project(":hidden-api"))` dependency; verify the actual inputs for
+your build variant and keep compilation stubs out of the APK.
+
+Adding stubs is not always sufficient. Hidden members missing from a public SDK
+type are not automatically merged into that type from a remapped `*Hidden`
+declaration. Where the contract remains invisible, use targeted `@Keep` or
+consumer keep rules. Libraries should ship the protection their consumers need.
+Validate the optimized Release DEX for the required method names and complete
+signatures, and test the affected system callback path as needed.
+
+### Guidance for AI-assisted consumer projects
+
+This repository provides a reusable
+[android-hidden-api-r8 skill template](docs/skills/android-hidden-api-r8/SKILL.md)
+with [failure cases](docs/skills/android-hidden-api-r8/references/failure-cases.md).
+The template is documentation for consuming projects; it is not installed as a
+Remap repository skill.
+
+#### Install the skill in your project
+
+From the **root of the project consuming Remap**, run:
+
+```shell
+npx skills add https://github.com/lisonge/remap/tree/main/docs/skills/android-hidden-api-r8
+```
+
+Follow the prompts to select your AI tool and install the skill and its
+references in the current project. Keep the installation project-local by
+leaving out `--global`.
+See the [skills CLI documentation](https://github.com/vercel-labs/skills) for
+other options.
+
+#### Add the project trigger
+
+Merge the following guidance into the consuming project's `AGENTS.md`, creating
+the file if needed. Adapt it to the project's modules and build variants, and
+preserve existing instructions. The link is relative to a root-level `AGENTS.md`.
+
+```markdown
+## Android Hidden APIs and R8
+
+When changing hidden interface or superclass implementations, system callbacks,
+remapping, or related module dependencies and R8 configuration, use
+[android-hidden-api-r8](.agents/skills/android-hidden-api-r8/SKILL.md).
+Also use it when investigating related failures in minified Release builds.
+Check the final application's actual R8 inputs and optimized runtime contracts;
+source-level override declarations, compilation success, and Debug behavior
+are not sufficient evidence. Limit checks to affected paths unless a broader
+audit is requested or the evidence warrants one.
+```
+
+After installation, ask the project's AI assistant to use
+`$android-hidden-api-r8` for a relevant task. If the assistant does not discover
+the skill, point it directly to `.agents/skills/android-hidden-api-r8/SKILL.md`.
+Include the installed skill and project guidance in version control to share
+them with contributors.
+
+Alternatively, ask your project's AI assistant to perform the setup:
+
+> Read https://github.com/lisonge/remap#hidden-apis-and-r8, install its android-hidden-api-r8
+> skill using the documented npx skills command for this project, and merge
+> the trigger guidance into this project's AGENTS.md. Adapt it to this project's
+> structure and preserve existing rules. Keep the setup project-local.
+
 ## Development checks
 
 Run unit tests with `./gradlew test`. The Android/KMP integration fixture uses
