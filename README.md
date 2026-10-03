@@ -266,8 +266,8 @@ signatures, and test the affected system callback path as needed.
 ### Guidance for AI-assisted consumer projects
 
 This repository provides a reusable
-[android-hidden-api-r8 skill template](docs/skills/android-hidden-api-r8/SKILL.md)
-with [failure cases](docs/skills/android-hidden-api-r8/references/failure-cases.md).
+[android-hidden-api-r8 skill template](skills/android-hidden-api-r8/SKILL.md)
+with [failure cases](skills/android-hidden-api-r8/references/failure-cases.md).
 The template is documentation for consuming projects; it is not installed as a
 Remap repository skill.
 
@@ -276,13 +276,13 @@ Remap repository skill.
 From the **root of the project consuming Remap**, use either command:
 
 ```shell
-npx skills add https://github.com/lisonge/remap/tree/main/docs/skills/android-hidden-api-r8
+npx skills add https://github.com/lisonge/remap/tree/main/skills/android-hidden-api-r8
 ```
 
 Or with pnpm:
 
 ```shell
-pnpm dlx skills add https://github.com/lisonge/remap/tree/main/docs/skills/android-hidden-api-r8
+pnpm dlx skills add https://github.com/lisonge/remap/tree/main/skills/android-hidden-api-r8
 ```
 
 Follow the prompts to select your AI tool and install the skill and its

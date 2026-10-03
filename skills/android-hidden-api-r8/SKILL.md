@@ -41,7 +41,7 @@ Read [failure patterns](references/failure-cases.md) as needed for callbacks los
 
 ## Update this skill
 
-Upstream: [lisonge/remap](https://github.com/lisonge/remap/tree/main/docs/skills/android-hidden-api-r8).
+Upstream: [lisonge/remap](https://github.com/lisonge/remap/tree/main/skills/android-hidden-api-r8).
 
 When asked to update this skill, use either command from the consuming project's root if it was installed with the skills CLI:
 
